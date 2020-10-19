@@ -2,7 +2,10 @@ package com.github.jordannegreiros.ifood.cadastro;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import javax.inject.Inject;
 import javax.transaction.Transactional;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -19,21 +22,31 @@ import javax.ws.rs.core.Response.Status;
 
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
+import com.github.jordannegreiros.ifood.cadastro.dto.AdicionarRestauranteDTO;
+import com.github.jordannegreiros.ifood.cadastro.dto.AtualizarRestauranteDTO;
+import com.github.jordannegreiros.ifood.cadastro.dto.RestauranteDTO;
+import com.github.jordannegreiros.ifood.cadastro.dto.RestauranteMapper;
+
 
 @Path("/restaurantes")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Tag(name = "restaurante")
 public class RestauranteResource {
+	
+	@Inject
+	RestauranteMapper restauranteMapper;
 
 	@GET
-	public List<Restaurante> listAll() {
-		return Restaurante.listAll();
+	public List<RestauranteDTO> listar() {
+		Stream<Restaurante> restaurates = Restaurante.streamAll();
+		return restaurates.map(r -> restauranteMapper.toRestauranteDTO(r)).collect(Collectors.toList());
 	}
 	
 	@POST
 	@Transactional
-	public Response adicionar(Restaurante restaurante) {
+	public Response adicionar(AdicionarRestauranteDTO dto) {
+		Restaurante restaurante = restauranteMapper.toRestaurante(dto);
 		restaurante.persist();
 		return Response.status(Status.CREATED).build();
 	}
@@ -41,13 +54,14 @@ public class RestauranteResource {
 	@PUT
 	@Path("{id}")
 	@Transactional
-	public void alterar(@PathParam("id") Long id, Restaurante dto) {
+	public void atualizar(@PathParam("id") Long id, AtualizarRestauranteDTO dto) {
 		Optional<Restaurante> restauranteOp = Restaurante.findByIdOptional(id);
 		if (restauranteOp.isEmpty()) {
 			throw new NotFoundException();
 		}
 		Restaurante restaurante = restauranteOp.get();
-		restaurante.nome = dto.nome;
+		// referencia para ser atualizada
+		restauranteMapper.toRestaurante(dto, restaurante);
 		restaurante.persist();
 	}
 	
@@ -56,10 +70,15 @@ public class RestauranteResource {
 	@Transactional
 	public void remover(@PathParam("id") Long id) {
 		Optional<Restaurante> restauranteOp = Restaurante.findByIdOptional(id);
+		
 		restauranteOp.ifPresentOrElse(Restaurante::delete, () -> {
 			throw new NotFoundException();
 		});
 	}
+	
+	/**
+	 * PRATOS 
+	 */
 	
 	@GET
 	@Path("{idRestaurante}/pratos")
